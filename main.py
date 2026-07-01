@@ -23,6 +23,8 @@ LOG_FILE = LOG_DIR / "app.log"
 MUTEX_NAME = "clipboard-paste-jpg-mutex"
 
 HOTKEY_ID = 1
+TIMER_ID = 1
+TIMER_MS = 150
 MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_NOREPEAT = 0x4000
@@ -36,6 +38,7 @@ JPEG_QUALITY = 92
 WINDOW_CLASS = "ClipboardPasteJpgHidden"
 
 user32 = ctypes.windll.user32
+_hotkey_registered = False
 
 
 def setup_logging() -> None:
@@ -178,12 +181,11 @@ def is_writable_folder(path: str | None) -> bool:
     return os.path.isdir(path)
 
 
-def handle_hotkey() -> None:
-    if not is_explorer_foreground():
-        return
-    if not clipboard_has_image():
-        return
+def should_capture_hotkey() -> bool:
+    return is_explorer_foreground() and clipboard_has_image()
 
+
+def handle_hotkey() -> None:
     folder = get_explorer_folder_path()
     if is_writable_folder(folder):
         save_clipboard_as_jpg(folder)
@@ -192,12 +194,38 @@ def handle_hotkey() -> None:
     logging.info("Skipped paste: no writable explorer folder.")
 
 
+def set_hotkey_registered(hwnd: int, enabled: bool) -> None:
+    global _hotkey_registered
+
+    if enabled and not _hotkey_registered:
+        ok = user32.RegisterHotKey(
+            hwnd,
+            HOTKEY_ID,
+            MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+            ord("V"),
+        )
+        if ok:
+            _hotkey_registered = True
+        else:
+            logging.warning("RegisterHotKey failed.")
+    elif not enabled and _hotkey_registered:
+        user32.UnregisterHotKey(hwnd, HOTKEY_ID)
+        _hotkey_registered = False
+
+
+def on_timer(hwnd: int) -> None:
+    set_hotkey_registered(hwnd, should_capture_hotkey())
+
+
 def window_proc(hwnd, msg, wparam, lparam):
     if msg == win32con.WM_HOTKEY and wparam == HOTKEY_ID:
         handle_hotkey()
         return 0
+    if msg == win32con.WM_TIMER and wparam == TIMER_ID:
+        on_timer(hwnd)
+        return 0
     if msg == win32con.WM_DESTROY:
-        user32.UnregisterHotKey(hwnd, HOTKEY_ID)
+        set_hotkey_registered(hwnd, False)
         win32gui.PostQuitMessage(0)
         return 0
     return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
@@ -223,21 +251,14 @@ def run() -> None:
         None,
     )
 
-    ok = user32.RegisterHotKey(
-        hwnd,
-        HOTKEY_ID,
-        MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
-        ord("V"),
-    )
-    if not ok:
-        raise OSError("Failed to register Ctrl+Shift+V hotkey.")
-
-    logging.info("clipboard-paste-jpg is running (Ctrl+Shift+V).")
+    user32.SetTimer(hwnd, TIMER_ID, TIMER_MS, None)
+    logging.info("clipboard-paste-jpg is running (explorer-only Ctrl+Shift+V).")
 
     try:
         win32gui.PumpMessages()
     finally:
-        user32.UnregisterHotKey(hwnd, HOTKEY_ID)
+        set_hotkey_registered(hwnd, False)
+        user32.KillTimer(hwnd, TIMER_ID)
         win32gui.DestroyWindow(hwnd)
         win32gui.UnregisterClass(WINDOW_CLASS, None)
 
