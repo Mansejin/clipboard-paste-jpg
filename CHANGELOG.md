@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-01
+
+### Added
+
+- **Standalone Windows installer (no Python required).** Download `clipboard-paste-jpg-win64.zip` from Releases, extract, and double-click `설치.bat` / `install.bat`.
+- Portable install copies the app to `%LOCALAPPDATA%\clipboard-paste-jpg` and adds a Startup shortcut.
+- `제거.bat` / `uninstall.bat` for one-click removal.
+- `build.ps1` — PyInstaller build script for maintainers.
+
+### Notes
+
+- Source install via `install_startup.ps1` still works for developers.
+
 ## [1.1.0] - 2026-07-01
 
 ### Fixed
@@ -33,5 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ctrl+V is never intercepted** — normal paste, file rename, and text input are unaffected.
 - Works on Windows 10 / 11 with Python 3.10+.
 
+[1.2.0]: https://github.com/Mansejin/clipboard-paste-jpg/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Mansejin/clipboard-paste-jpg/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Mansejin/clipboard-paste-jpg/releases/tag/v1.0.0
